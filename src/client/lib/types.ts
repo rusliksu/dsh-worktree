@@ -30,6 +30,12 @@ export interface WorktreeList {
   defaultRef?: string
   currentBranch?: string
   worktrees: Worktree[]
+  policy?: {
+    managed: boolean
+    branchPrefix: string
+    worktreeRoot: string
+    canRemove: boolean
+  }
 }
 
 export interface WorktreeClassification {

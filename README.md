@@ -19,13 +19,13 @@ A Git worktree plugin for DeepSeek Harness that creates task branches, registers
 - Choose the current branch or the repository's main branch.
 - Register and open the new worktree as a DSH Workspace with an isolated session.
 - Create task branches as `task/<name>`.
-- Manage and remove linked worktrees from the **Worktree Management** settings page.
+- Inspect and open linked worktrees from the **Worktree Management** settings page.
 - No additional service or project configuration.
-- Supports DSH themes, Chinese, and English.
+- Supports DSH themes, Russian, Chinese, and English.
 
 ## Compatibility
 
-Built against the DSH **0.2.1-alpha.2** client contract, with support for `0.1.5-rc.1 || 0.1.5-rc.2 || 0.2.1-alpha.2` (web and desktop profiles).
+This Desktop fork is built and tested against DSH **0.2.0-rc.2** (web and desktop profiles). It adds Russian UI and an optional managed Windows helper. Removal is disabled; see [the Russian guide](README.ru.md) for creation policy and installation.
 
 ## Usage
 

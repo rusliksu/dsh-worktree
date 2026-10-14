@@ -44,7 +44,7 @@ export function CreateWorktreeDialog({ target, api, workspaces, sessions, defaul
     setLoading(true)
     setError("")
     api.list(target.path).then((next) => {
-      if (alive) setData(next)
+      if (alive) { setData(next); if (next.policy?.managed) setBaseChoice("main") }
     }).catch((reason) => {
       if (alive) setError(String(reason?.message ?? reason))
     }).finally(() => {
@@ -57,11 +57,13 @@ export function CreateWorktreeDialog({ target, api, workspaces, sessions, defaul
   // slugOf has a fallback for other callers; a create form must not silently
   // turn empty or punctuation-only input into a task named "task".
   const normalizedName = taskName.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "")
-  const taskSlug = normalizedName ? slugOf(taskName) : ""
+  const taskSlug = data?.policy?.managed
+    ? taskName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48).replace(/-+$/, "")
+    : normalizedName ? slugOf(taskName) : ""
   const validSlug = /^[a-z0-9_][a-z0-9._-]*$/.test(taskSlug)
     && !taskSlug.includes("..") && !taskSlug.endsWith(".") && !taskSlug.endsWith(".lock")
-  const taskBranch = validSlug ? `task/${taskSlug}` : ""
-  const taskPath = repoPath && validSlug ? suggestedPath(repoPath, taskSlug) : ""
+  const taskBranch = validSlug ? `${data?.policy?.branchPrefix ?? "task"}/${taskSlug}` : ""
+  const taskPath = repoPath && validSlug ? suggestedPath(repoPath, taskSlug, data?.policy?.worktreeRoot) : ""
   const currentBranch = data?.worktrees.find((row) => pathKey(row.path) === pathKey(target.path))?.branch
     ?? "HEAD"
   const mainBranch = data?.defaultBranch
@@ -69,6 +71,8 @@ export function CreateWorktreeDialog({ target, api, workspaces, sessions, defaul
     ?? currentBranch
   const baseRef = baseChoice === "main" ? data?.defaultRef ?? mainBranch : currentBranch
   const invalidName = taskName.length > 0 && !validSlug
+  const nameError = data?.policy?.managed ? "invalidManagedTaskName" : "invalidTaskName"
+  const nameHint = data?.policy?.managed ? "managedTaskNameHint" : "taskNameHint"
   const fieldsDisabled = busy || loading || !data || !!recovery
 
   const startBusy = () => { busyRef.current = true; setBusy(true); setError("") }
@@ -78,14 +82,14 @@ export function CreateWorktreeDialog({ target, api, workspaces, sessions, defaul
   const registerAndOpen = async (createdPath: string, slug: string) => {
     const workspace = await workspaces.create({ path: createdPath })
     try {
-      await workspaces.rename(workspace.workspaceId, `${target.title}/${slug}`)
+      if (data?.policy?.canRemove !== false) await workspaces.rename(workspace.workspaceId, `${target.title}/${slug}`)
       const sessionId = await sessions.create({ workspaceId: workspace.workspaceId })
       onCreated(createdPath)
       sessions.open(sessionId)
       onClose()
     } catch (reason) {
-      // A failed retry must not leave another partially registered Workspace.
-      await workspaces.delete(workspace.workspaceId)
+      // DSH may resolve an existing registration; preserve its title and chats.
+      if (data?.policy?.canRemove !== false) await workspaces.delete(workspace.workspaceId)
       throw reason
     }
   }
@@ -93,7 +97,7 @@ export function CreateWorktreeDialog({ target, api, workspaces, sessions, defaul
   const retryRegister = async () => {
     if (!recovery || busyRef.current) return
     startBusy()
-    try { await registerAndOpen(recovery.path, recovery.branch.replace(/^task\//, "")); setRecovery(null) }
+    try { await registerAndOpen(recovery.path, recovery.branch.slice(recovery.branch.indexOf("/") + 1)); setRecovery(null) }
     catch (reason: any) { setError(`${t("registerFailed")} ${String(reason?.message ?? reason)}`) }
     finally { endBusy() }
   }
@@ -109,25 +113,16 @@ export function CreateWorktreeDialog({ target, api, workspaces, sessions, defaul
   const create = async () => {
     if (busyRef.current || recovery || loading || !data || !repoPath) return
     if (!validSlug) {
-      setError(t(taskName.trim() ? "invalidTaskName" : "fillTaskName"))
+      setError(t(taskName.trim() ? nameError : "fillTaskName"))
       return
     }
     startBusy()
     let createdPath: string | undefined
-    let workspace: Workspace | undefined
     try {
       const created = await api.create({ repoPath, path: taskPath, branch: taskBranch, baseRef })
       createdPath = created.path
-      workspace = await workspaces.create({ path: created.path })
-      await workspaces.rename(workspace.workspaceId, `${target.title}/${taskSlug}`)
-      const sessionId = await sessions.create({ workspaceId: workspace.workspaceId })
-      onCreated(created.path)
-      sessions.open(sessionId)
-      onClose()
+      await registerAndOpen(created.path, taskSlug)
     } catch (reason: any) {
-      if (workspace?.workspaceId) {
-        try { await workspaces.delete(workspace.workspaceId) } catch (cleanupError: any) { if (createdPath) setRecovery({ repoPath, path: createdPath, branch: taskBranch }); setError(format(t("cleanupFailed"), { error: String(cleanupError?.message ?? cleanupError), path: createdPath ?? "" })); return }
-      }
       if (createdPath) { setRecovery({ repoPath, path: createdPath, branch: taskBranch }); setError(t("registerFailed")) }
       else setError(`${t("operationFailed")}${String(reason?.message ?? reason)}`)
     } finally {
@@ -154,7 +149,7 @@ export function CreateWorktreeDialog({ target, api, workspaces, sessions, defaul
               <div className="dswt-field">
                 <label className="dswt-field-label" htmlFor={`${id}-name`}>{t("taskName")}</label>
                 <Input id={`${id}-name`} value={taskName} disabled={fieldsDisabled} onChange={(event) => setTaskName(event.target.value)} placeholder={t("taskNamePlaceholder")} autoFocus autoComplete="off" spellCheck={false} aria-invalid={invalidName || undefined} aria-describedby={`${id}-name-note`} />
-                <p id={`${id}-name-note`} className="dswt-form-note">{t(invalidName ? "invalidTaskName" : "taskNameHint")}</p>
+                <p id={`${id}-name-note`} className="dswt-form-note">{t(invalidName ? nameError : nameHint)}</p>
               </div>
 
               <fieldset className="dswt-field dswt-base-fieldset" disabled={fieldsDisabled}>
@@ -176,7 +171,7 @@ export function CreateWorktreeDialog({ target, api, workspaces, sessions, defaul
 
           <footer className="dswt-dialog-footer">
             {recovery ? <>
-              <Button type="button" className="dswt-button-danger" disabled={busy} onClick={() => void cleanupCreated()}>{t("cleanupCreated")}</Button>
+              {data?.policy?.canRemove !== false ? <Button type="button" className="dswt-button-danger" disabled={busy} onClick={() => void cleanupCreated()}>{t("cleanupCreated")}</Button> : null}
               <Button type="button" className="dswt-button-primary" disabled={busy} onClick={() => void retryRegister()}>{busy ? <Loader2 size={16} className="dswt-spin" aria-hidden="true" /> : null}{t("retryRegister")}</Button>
             </> : <>
               <Button type="button" className="dswt-button-ghost" disabled={busy} onClick={dismiss}>{t("cancel")}</Button>

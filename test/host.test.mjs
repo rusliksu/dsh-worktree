@@ -2,13 +2,18 @@ import { describe, expect, it } from "vitest"
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { execFile } from "node:child_process"
+import { promisify } from "node:util"
 import { apply, discoverGitRoots, fail, parseWorktrees, samePath } from "../src/host/index.js"
 
-function handleFor(outputs = {}) {
+function handleFor(outputs = {}, config = {}, runHelper) {
   const routes = new Map()
+  const calls = []
   const subprocess = {
     spawn({ argv }) {
-      const key = argv.slice(3).join(" ")
+      calls.push(argv)
+      if (argv[0] === "pwsh" && runHelper) return runHelper(argv)
+      const key = argv[0] === "pwsh" ? "helper" : argv.slice(3).join(" ")
       const result = outputs[key] ?? ""
       const stdout = typeof result === "string" ? result : result.stdout ?? ""
       const stderr = typeof result === "string" ? "" : result.stderr ?? ""
@@ -31,7 +36,7 @@ function handleFor(outputs = {}) {
     } } },
     effect(effect) { return effect() },
   }
-  apply(ctx)
+  apply(ctx, config)
   const handler = async (endpoint, payload = {}, signal, method = `dsh-simple-worktree/${endpoint}`) => {
     const path = `/api/dsh-simple-worktree/${endpoint}`
     const route = routes.get(path)
@@ -53,8 +58,81 @@ function handleFor(outputs = {}) {
     expect(message).toEqual({ type: "server-response", rpcId: "test", result: expect.any(Object) })
     return message.result
   }
-  return Object.assign(handler, { routes })
+  return Object.assign(handler, { routes, calls })
 }
+
+describe.skipIf(process.platform !== "win32")("managed Windows worktrees", () => {
+  const config = { windowsHelper: "C:/helpers/create.ps1", worktreeRoot: "C:/managed" }
+  const payload = { repoPath: "C:/repo", path: "C:/managed/repo-fix-login", branch: "codex/fix-login", baseRef: "origin/main" }
+  const outputs = {
+    "rev-parse --show-toplevel": "C:/repo",
+    "rev-parse --git-common-dir": ".git",
+    "worktree list --porcelain": "worktree C:/repo\nHEAD abc\nbranch refs/heads/main\n",
+    "symbolic-ref --quiet --short refs/remotes/origin/HEAD": "origin/main",
+    "for-each-ref --format=%(refname:short) refs/heads refs/remotes/origin": "main\norigin/main",
+  }
+
+  it("delegates creation to the helper and returns its verified directory", async () => {
+    const handler = handleFor({ ...outputs, helper: JSON.stringify({ Worktree: payload.path, Branch: payload.branch, BaseRef: "origin/main", Created: true }) }, config)
+    expect(await handler("worktree.create", payload)).toMatchObject({ ok: true, value: { path: payload.path, branch: payload.branch, created: true } })
+    expect(handler.calls.some(args => args[0] === "pwsh")).toBe(true)
+    expect(handler.calls.some(args => args.includes("add"))).toBe(false)
+  })
+
+  it("preserves a dirty main checkout and never starts the helper", async () => {
+    const handler = handleFor({ ...outputs, "status --porcelain --untracked-files=all": " M tracked.txt\n?? untracked.txt" }, config)
+    expect(await handler("worktree.create", payload)).toMatchObject({ ok: false, error: { message: expect.stringContaining("uncommitted changes") } })
+    expect(handler.calls.some(args => args[0] === "pwsh")).toBe(false)
+  })
+
+  it.each([
+    { ...payload, path: "C:/outside/repo-fix-login" },
+    { ...payload, branch: "task/fix-login" },
+    { ...payload, branch: "codex/a..b" },
+  ])("rejects unsupported destinations and names without mutation", async invalid => {
+    const handler = handleFor(outputs, config)
+    expect(await handler("worktree.create", invalid)).toMatchObject({ ok: false })
+    expect(handler.calls.some(args => args[0] === "pwsh" || args.includes("add"))).toBe(false)
+  })
+
+  it("reopens a registered task without creating a second worktree", async () => {
+    const handler = handleFor({ ...outputs, "worktree list --porcelain": `${outputs["worktree list --porcelain"]}\nworktree ${payload.path}\nHEAD def\nbranch refs/heads/${payload.branch}\n` }, config)
+    expect(await handler("worktree.create", payload)).toMatchObject({ ok: true, value: { path: payload.path, branch: payload.branch, created: false } })
+    expect(handler.calls.some(args => args[0] === "pwsh")).toBe(false)
+  })
+
+  it.each(["worktree.remove", "worktree.remove-session", "worktree.prune"])("refuses %s before running filesystem or Git cleanup", async endpoint => {
+    const handler = handleFor(outputs, config)
+    expect(await handler(endpoint, payload)).toMatchObject({ ok: false, error: { message: expect.stringContaining("preservation") } })
+    expect(handler.calls).toEqual([])
+  })
+
+  it("reports an unexpected helper destination without cleanup", async () => {
+    const handler = handleFor({ ...outputs, helper: JSON.stringify({ Worktree: "C:/outside", Branch: payload.branch }) }, config)
+    expect(await handler("worktree.create", payload)).toMatchObject({ ok: false, error: { message: expect.stringContaining("unexpected task path") } })
+    expect(handler.calls.some(args => args.includes("remove") || args.includes("prune"))).toBe(false)
+  })
+
+  it("passes apostrophes and PowerShell expressions as literal arguments", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dsh-helper-quote-"))
+    const repo = join(root, "O'Reilly $(throw 'injected')")
+    const helper = join(root, "helper's script.ps1")
+    const destination = join(root, `${repo.split(/[\\/]/).pop()}-fix-login`)
+    const base = "main'; throw 'injected"
+    try {
+      await writeFile(helper, `param([string]$Task,[string]$Repo,[string]$Base,[string]$WorktreeRoot)\n[pscustomobject]@{ Worktree=(Join-Path $WorktreeRoot ((Split-Path -Leaf $Repo)+'-'+$Task)); Branch='codex/'+$Task; BaseRef=$Base; Created=$true }\n`)
+      const execute = promisify(execFile)
+      const handler = handleFor({ ...outputs, "worktree list --porcelain": `worktree ${repo}\nHEAD abc\nbranch refs/heads/main\n` }, { windowsHelper: helper, worktreeRoot: root }, argv => {
+        let stdout = ""
+        const done = execute(argv[0], argv.slice(1), { windowsHide: true }).then(result => { stdout = result.stdout; return { exitCode: 0, signal: null } })
+        return { done, collected: { stdout: { readFrom: () => ({ text: stdout }) } } }
+      })
+      expect(await handler("worktree.create", { repoPath: repo, path: destination, branch: payload.branch, baseRef: base })).toMatchObject({ ok: true, value: { path: destination, branch: payload.branch, baseRef: base } })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
 
 describe("worktree porcelain parser", () => {
   it("matches Windows workspace paths against slash-separated Git paths", () => {
@@ -165,6 +243,11 @@ describe("worktree porcelain parser", () => {
 })
 
 describe("worktree RPC contract", () => {
+  it.each(["worktree.remove", "worktree.remove-session", "worktree.prune"])("also refuses %s without managed-helper configuration", async endpoint => {
+    const handler = handleFor()
+    expect(await handler(endpoint, { repoPath: "/repo", path: "/repo.worktrees/task" })).toMatchObject({ ok: false })
+    expect(handler.calls).toEqual([])
+  })
   it("registers only exact shared API routes for every endpoint", () => {
     expect([...handleFor().routes.keys()].sort()).toEqual([
       "worktree.list", "worktree.scan", "worktree.classify", "worktree.create",
