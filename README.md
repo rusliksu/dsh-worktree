@@ -50,7 +50,9 @@ You can also install from GitHub with `dsh plugin --profile web add github:alpac
 
 ### Manage worktrees
 
-Open **Settings → Worktree Management** to scan every Workspace for Git projects and linked worktrees, inspect their branch and dirty state, and remove worktrees that are no longer needed.
+Open **Settings → Worktree Management** to find Git projects and linked worktrees, inspect their branch and dirty state, and open a session. Select a specific Workspace when a broad home-directory scan reaches its limit. This Desktop build disables removal and pruning until a separate preservation review is performed.
+
+Choose **Git changes** beside a repository or worktree to inspect tracked-file patches from the working tree, staging area, or committed branch changes since the merge base. The viewer does not change files, the index or branches, and disables external diff/textconv helpers. Untracked files appear after `git add`; renames are displayed as deletion plus addition. Credential files remain path-only and binary files show a difference notice. Comparisons exceeding 500 files or 256 KiB of output are rejected rather than shown partially.
 
 The worktree is created at:
 

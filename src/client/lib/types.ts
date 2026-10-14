@@ -23,6 +23,15 @@ export interface WorktreeStatus {
   output: string
 }
 
+export type ReviewMode = 'working' | 'staged' | 'branch'
+export interface ReviewSummary {
+  path: string
+  mode: ReviewMode
+  branch: string
+  baseCommit?: string
+  files: { path: string; status: string; protected: boolean }[]
+}
+
 export interface WorktreeList {
   repoPath: string
   commonDir: string
