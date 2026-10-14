@@ -1,10 +1,15 @@
 import { clientRequestSchema } from '@deepseek-ai/dsh-client-connection'
-import { readdir, readFile, rm } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import z from '@deepseek-ai/schemastery'
+import { readdir } from 'node:fs/promises'
+import { basename, isAbsolute, join } from 'node:path'
 
 const API_PREFIX = '/api/dsh-simple-worktree'
 const ENDPOINTS = ['worktree.list', 'worktree.scan', 'worktree.classify', 'worktree.create', 'worktree.remove', 'worktree.remove-session', 'worktree.status', 'worktree.prune']
+
+export const Config = z.object({
+  windowsHelper: z.string().default(''),
+  worktreeRoot: z.string().default(''),
+})
 
 export const ok = (value) => ({ ok: true, value })
 const PUBLIC_ERROR_CODES = new Set([
@@ -30,19 +35,13 @@ const pathKey = (value) => {
 }
 export const samePath = (left, right) => pathKey(left) === pathKey(right)
 
-async function removeOrphanedWorktree(path) {
-  if (!existsSync(path)) return false
-  let marker
-  try { marker = await readFile(`${path}/.git`, 'utf8') } catch { return false }
-  const gitdir = marker.match(/^gitdir:\s*(.+)\s*$/m)?.[1]
-  if (!gitdir || existsSync(gitdir)) return false
-  await rm(path, { recursive: true, force: false })
-  return true
+export async function runGit(subprocess, cwd, args) {
+  return runProcess(subprocess, cwd, ['git', '-C', cwd, ...args])
 }
 
-export async function runGit(subprocess, cwd, args) {
+async function runProcess(subprocess, cwd, argv) {
   const handle = subprocess.spawn({
-    argv: ['git', '-C', cwd, ...args],
+    argv,
     cwd,
     stdio: {
       stdin: 'ignore',
@@ -55,7 +54,8 @@ export async function runGit(subprocess, cwd, args) {
   const stdout = handle.collected.stdout?.readFrom(0).text ?? ''
   const stderr = handle.collected.stderr?.readFrom(0).text ?? ''
   if (outcome.exitCode !== 0 || outcome.signal !== null) {
-    throw new Error(`git ${args.join(' ')} failed${outcome.signal ? ` (${outcome.signal})` : ` (exit ${outcome.exitCode})`}: ${stderr.trim() || stdout.trim()}`)
+    const command = argv[0] === 'git' ? `git ${argv.slice(3).join(' ')}` : 'Worktree helper'
+    throw new Error(`${command} failed${outcome.signal ? ` (${outcome.signal})` : ` (exit ${outcome.exitCode})`}: ${stderr.trim() || stdout.trim()}`)
   }
   return stdout.trim()
 }
@@ -176,9 +176,18 @@ export const classifyGitError = (message) => message.includes('not a git reposit
 export const name = '@alpacachen/dsh-simple-worktree'
 export const inject = ['connection', 'subprocess']
 
-export function apply(ctx) {
+export function apply(ctx, rawConfig = {}) {
+  const config = Config(rawConfig)
+  const managed = Boolean(config.windowsHelper)
+  if (managed && (process.platform !== 'win32' || !isAbsolute(config.windowsHelper) || !isAbsolute(config.worktreeRoot))) {
+    throw new Error('Managed worktrees require Windows and absolute helper and worktree-root paths.')
+  }
+  const policy = { managed, branchPrefix: managed ? 'codex' : 'task', worktreeRoot: config.worktreeRoot, canRemove: false }
   const handle = async (endpoint, payload = {}, signal) => {
     if (signal?.aborted) return fail('cancelled', 'The request was cancelled.')
+    if (['worktree.remove', 'worktree.remove-session', 'worktree.prune'].includes(endpoint)) {
+      return fail('bad-request', 'Worktree removal requires a separate preservation and cleanup review.')
+    }
 
     const listRepository = async (path) => {
       if (!path) throw new Error('Select a DSH Workspace.')
@@ -190,7 +199,7 @@ export function apply(ctx) {
       const worktrees = parseWorktrees(porcelain)
       const repoPath = worktrees.find((worktree) => worktree.isMain)?.path ?? topLevel
       const defaultBranch = await detectDefaultBranch(ctx.subprocess, repoPath, worktrees)
-      return { repoPath, commonDir, defaultBranch: defaultBranch.name, defaultRef: defaultBranch.ref, worktrees }
+      return { repoPath, commonDir, defaultBranch: defaultBranch.name, defaultRef: defaultBranch.ref, worktrees, policy }
     }
 
     if (endpoint === 'worktree.list') return recover(async () => {
@@ -241,6 +250,30 @@ export function apply(ctx) {
       const branch = typeof payload.branch === 'string' ? payload.branch.trim() : ''
       const baseRef = typeof payload.baseRef === 'string' && payload.baseRef.trim() ? payload.baseRef.trim() : 'HEAD'
       if (!repoPath || !path || !branch) throw new Error('Task name, working directory and branch are required.')
+      if (managed) {
+        const task = branch.slice('codex/'.length)
+        if (!branch.startsWith('codex/') || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(task) || task.length > 48) {
+          throw new Error('Managed task names use 1–48 lowercase letters, digits and hyphens.')
+        }
+        const repository = await listRepository(repoPath)
+        if (!samePath(repoPath, repository.repoPath)) throw new Error('Select the main repository Workspace.')
+        const expectedPath = join(config.worktreeRoot, `${basename(repoPath)}-${task}`)
+        if (!samePath(path, expectedPath)) throw new Error('Worktree destination does not match the managed task path.')
+        const existing = repository.worktrees.find(row => row.branch === branch)
+        if (existing) return { path: existing.path, branch, baseRef, created: false }
+        if (await runGit(ctx.subprocess, repoPath, ['status', '--porcelain', '--untracked-files=all'])) {
+          throw new Error('The main repository has uncommitted changes. Preserve them before creating a new worktree.')
+        }
+        // Single-quoted PowerShell arguments keep repository paths and refs literal.
+        const quote = value => `'${value.replace(/'/g, "''")}'`
+        const command = `$ErrorActionPreference = 'Stop'; & ${quote(config.windowsHelper)} -Task ${quote(task)} -Repo ${quote(repoPath)} -Base ${quote(baseRef)} -WorktreeRoot ${quote(config.worktreeRoot)} | ConvertTo-Json -Compress`
+        const output = await runProcess(ctx.subprocess, repoPath, ['pwsh', '-NoProfile', '-NonInteractive', '-Command', command])
+        const result = JSON.parse(output)
+        if (result.Branch !== branch || !samePath(result.Worktree, expectedPath)) {
+          throw new Error('The worktree helper returned an unexpected task path or branch; no cleanup was attempted.')
+        }
+        return { path: result.Worktree, branch: result.Branch, baseRef: result.BaseRef ?? baseRef, created: result.Created }
+      }
       const branchRef = await tryRunGit(ctx.subprocess, repoPath, ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`])
       const args = branchRef
         ? ['worktree', 'add', path, branch]
@@ -248,36 +281,6 @@ export function apply(ctx) {
       await runGit(ctx.subprocess, repoPath, args)
       return { path, branch, baseRef }
     })
-
-    if (endpoint === 'worktree.remove') return recover(async () => {
-      const repoPath = typeof payload.repoPath === 'string' ? payload.repoPath.trim() : ''
-      const path = typeof payload.path === 'string' ? payload.path.trim() : ''
-      if (!repoPath || !path) throw new Error('Repository and worktree paths are required.')
-      try {
-        await runGit(ctx.subprocess, repoPath, ['worktree', 'remove', path])
-      } catch (error) {
-        if (await removeOrphanedWorktree(path)) return { removed: true, path, orphaned: true }
-        if (!existsSync(path) && existsSync(repoPath)) {
-          await runGit(ctx.subprocess, repoPath, ['worktree', 'prune'])
-          return { removed: true, path, pruned: true }
-        }
-        throw error
-      }
-      return { removed: true, path }
-    })
-
-    if (endpoint === 'worktree.remove-session') return recover(async () => {
-      const path = typeof payload.path === 'string' ? payload.path.trim() : ''
-      if (!path) throw new Error('Session working directory is required.')
-      const porcelain = await runGit(ctx.subprocess, path, ['worktree', 'list', '--porcelain'])
-      const worktrees = parseWorktrees(porcelain)
-      const target = worktrees.find((worktree) => samePath(worktree.path, path))
-      if (!target || target.isMain) return { removed: false, path }
-      const repoPath = worktrees.find((worktree) => worktree.isMain)?.path
-      if (!repoPath) throw new Error('Could not locate the main repository.')
-      await runGit(ctx.subprocess, repoPath, ['worktree', 'remove', target.path])
-      return { removed: true, path: target.path }
-    }, classifyGitError)
 
     if (endpoint === 'worktree.status') return recover(async () => {
       const path = typeof payload.path === 'string' ? payload.path.trim() : ''
@@ -289,13 +292,6 @@ export function apply(ctx) {
         changedFiles: lines.filter((line) => line && !line.startsWith('## ')).length,
         output,
       }
-    })
-
-    if (endpoint === 'worktree.prune') return recover(async () => {
-      const path = typeof payload.path === 'string' ? payload.path.trim() : ''
-      if (!path) throw new Error('Repository path is required.')
-      await runGit(ctx.subprocess, path, ['worktree', 'prune'])
-      return { pruned: true }
     })
 
     return fail('bad-request', `Unknown endpoint: ${endpoint}`)

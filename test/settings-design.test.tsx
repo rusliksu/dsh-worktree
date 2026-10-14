@@ -46,6 +46,15 @@ function visibleRepositories() {
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
 describe("WorktreesSettings discovery controls", () => {
+  it("opens managed worktrees while hiding deletion controls", async () => {
+    const next = setup({ repos: [{ ...repository("alpha", [worktree(linkedPath, "codex/feature")]), policy: { managed: true, branchPrefix: "codex", worktreeRoot: "/managed", canRemove: false } } as any] })
+    next.mount()
+    await settled()
+    expect(screen.queryByRole("button", { name: t("remove") })).toBeNull()
+    await userEvent.setup().click(screen.getByRole("button", { name: t("openSession") }))
+    await waitFor(() => expect(next.sessions.open).toHaveBeenCalledWith("new-session"))
+    expect(next.api.remove).not.toHaveBeenCalled()
+  })
   const repos = [
     repository("alpha", [worktree(linkedPath, "task/feature")]),
     repository("beta", [worktree("/external/dirty-checkout", "fix/payments")]),

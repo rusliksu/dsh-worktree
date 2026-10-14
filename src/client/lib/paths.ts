@@ -15,7 +15,12 @@ export function slugOf(value: unknown) {
   return String(value || "task").trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "task"
 }
 
-export function suggestedPath(repoPath: string, slug: string) {
+export function suggestedPath(repoPath: string, slug: string, worktreeRoot = "") {
+  if (worktreeRoot) {
+    const separator = worktreeRoot.includes("\\") ? "\\" : "/"
+    const repoName = cleanPath(repoPath).split(/[\\/]/).pop()
+    return `${cleanPath(worktreeRoot)}${separator}${repoName}-${slug}`
+  }
   const separator = repoPath.includes("\\") ? "\\" : "/"
   return `${cleanPath(repoPath)}.worktrees${separator}${slug}`
 }
