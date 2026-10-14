@@ -1,4 +1,4 @@
-import type { ConnectionService, CreateWorktreeResult, WorktreeClassification, WorktreeList, WorktreeStatus } from "./types"
+import type { ConnectionService, CreateWorktreeResult, ReviewMode, ReviewSummary, WorktreeClassification, WorktreeList, WorktreeStatus } from "./types"
 
 export const CHANNEL = "/api"
 
@@ -40,6 +40,8 @@ export function createWorktreeApi(connection: ConnectionService) {
   }
 
   return {
+    reviewSummary: (path: string, mode: ReviewMode, baseRef?: string, signal?: AbortSignal) => read<ReviewSummary>("review.summary", { path, mode, baseRef }, signal),
+    reviewDiff: (path: string, mode: ReviewMode, file: string, baseRef?: string, signal?: AbortSignal) => read<{ file: string; patch: string }>("review.diff", { path, mode, file, baseRef }, signal),
     list: (path: string) => read<WorktreeList>("worktree.list", { path }),
     scan: (paths: string[], signal?: AbortSignal) => read<WorktreeList[]>("worktree.scan", { paths }, signal),
     classify: (path: string) => read<WorktreeClassification>("worktree.classify", { path }),

@@ -47,4 +47,5 @@ const wrapped = [
 ].join("\n")
 writeFileSync(resolve(root, "client/client.js"), wrapped)
 copyFileSync(resolve(root, "src/host/index.js"), resolve(root, "lib/index.js"))
+copyFileSync(resolve(root, "src/host/review.js"), resolve(root, "lib/review.js"))
 console.log(`✓ built ${moduleId} client (${wrapped.length} bytes) and host`)

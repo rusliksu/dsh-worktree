@@ -8,7 +8,7 @@ try {
 }
 
 try {
-  execFileSync("git", ["diff", "--exit-code", "--", "client/client.js", "lib/index.js"], { stdio: "inherit" })
+  execFileSync("git", ["diff", "--exit-code", "--", "client/client.js", "lib/index.js", "lib/review.js"], { stdio: "inherit" })
   console.log("tracked client and host bundles match the latest build")
 } catch {
   console.error("generated bundles are stale; run pnpm build and commit client/client.js plus lib/index.js")

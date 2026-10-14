@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { AlertCircle, ArrowUpRight, Check, ChevronDown, ChevronRight, FolderGit2, GitBranch, GitFork, Loader2, Plus, RefreshCw, Search, Trash2, X } from "lucide-react"
+import { AlertCircle, ArrowUpRight, Check, ChevronDown, ChevronRight, FileDiff, FolderGit2, GitBranch, GitFork, Loader2, Plus, RefreshCw, Search, Trash2, X } from "lucide-react"
+import { GitReviewDialog } from './GitReviewDialog'
 import { format, useT } from "../lib/i18n"
 import { pathKey } from "../lib/paths"
 import type { Workspace, Worktree, WorktreeList, WorkspacesService, SessionsService } from "../lib/types"
@@ -28,6 +29,7 @@ export function WorktreesSettings({ api, workspaces, sessions, close, onCreate }
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
   const [removal, setRemoval] = useState<{ repo: WorktreeList; row: Worktree } | null>(null)
   const [removalError, setRemovalError] = useState("")
+  const [reviewPath, setReviewPath] = useState<string | null>(null)
   const refreshController = useRef<AbortController | null>(null)
   const refresh = useCallback(async () => {
     refreshController.current?.abort()
@@ -145,6 +147,7 @@ export function WorktreesSettings({ api, workspaces, sessions, close, onCreate }
               {canExpand ? <ChevronRight size={14} className="dswt-chevron" /> : <span className="dswt-chevron-placeholder" />}<FolderGit2 size={18} className="dswt-repo-icon" />
               <span className="dswt-repo-heading"><span className="dswt-repo-title"><h3>{repoName(repo.repoPath)}</h3><span className="dswt-branch-label" title={`${t("currentBranchLabel")}: ${repo.currentBranch ?? t("detached")}`}><GitBranch size={12} /><span className="dswt-visually-hidden">{t("currentBranchLabel")}</span><span className="dswt-branch-value">{repo.currentBranch ?? t("detached")}</span></span>{repo.worktrees.length > 0 ? <span className="dswt-count">{repo.worktrees.length}</span> : null}</span><span className="dswt-repo-path" title={repo.repoPath}>{repo.repoPath}</span></span>
             </button>
+            <Button className="dswt-icon-button" aria-label={`${t('reviewChanges')} · ${repoName(repo.repoPath)}`} title={t('reviewChanges')} onClick={() => setReviewPath(repo.repoPath)}><FileDiff size={16} /></Button>
             {onCreate ? <Button className="dswt-button-ghost dswt-create-repo" aria-label={t("createWorktree")} title={`${t("createWorktree")} · ${repoName(repo.repoPath)}`} onClick={() => onCreate({ path: repo.repoPath, title: repoName(repo.repoPath) })}><Plus size={15} /><span>{t("newWorktree")}</span></Button> : null}
           </header>
           {expanded ? <div className="dswt-worktree-list">
@@ -154,7 +157,7 @@ export function WorktreesSettings({ api, workspaces, sessions, close, onCreate }
               return <div className="dswt-worktree" key={row.path}>
                 <GitFork size={16} className="dswt-tree-icon" aria-hidden="true" />
                 <div className="dswt-worktree-info"><div className="dswt-worktree-title"><strong>{row.branch ?? t("detached")}</strong><span className={`dswt-status dswt-status-${state}`} title={row.statusError}><span className="dswt-status-dot" />{statusLabel(row)}</span>{row.locked ? <span className="dswt-status">{t("locked")}</span> : null}</div><div className="dswt-worktree-path" title={row.path}>{relativePath(repo.repoPath, row.path)}</div></div>
-                <div className="dswt-worktree-actions"><Button className="dswt-icon-button" disabled={!!action || busy || !!row.statusError} aria-label={t("openSession")} title={t("openSession")} onClick={() => void openSession(repo, row)}>{action === `open:${row.path}` ? <Loader2 size={15} className="dswt-spin" /> : <ArrowUpRight size={16} />}</Button>{repo.policy?.canRemove !== false ? <Button className="dswt-icon-button dswt-delete-action" disabled={busy || !!action || !!row.changedFiles || row.locked} aria-label={t("remove")} title={removeReason} onClick={() => { setRemovalError(""); setRemoval({ repo, row }) }}><Trash2 size={15} /></Button> : null}</div>
+                <div className="dswt-worktree-actions"><Button className="dswt-icon-button" disabled={!!row.statusError} aria-label={`${t('reviewChanges')} · ${row.branch ?? row.path}`} title={t('reviewChanges')} onClick={() => setReviewPath(row.path)}><FileDiff size={16} /></Button><Button className="dswt-icon-button" disabled={!!action || busy || !!row.statusError} aria-label={t("openSession")} title={t("openSession")} onClick={() => void openSession(repo, row)}>{action === `open:${row.path}` ? <Loader2 size={15} className="dswt-spin" /> : <ArrowUpRight size={16} />}</Button>{repo.policy?.canRemove !== false ? <Button className="dswt-icon-button dswt-delete-action" disabled={busy || !!action || !!row.changedFiles || row.locked} aria-label={t("remove")} title={removeReason} onClick={() => { setRemovalError(""); setRemoval({ repo, row }) }}><Trash2 size={15} /></Button> : null}</div>
               </div>
             })}
           </div> : null}
@@ -162,6 +165,7 @@ export function WorktreesSettings({ api, workspaces, sessions, close, onCreate }
       })}
     </div>
     <details className="dswt-scan-help"><summary>{t("scanHelp")}</summary><p>{t("worktreesSubtitle")}</p></details>
+    {reviewPath ? <GitReviewDialog path={reviewPath} api={api} onClose={() => setReviewPath(null)} /> : null}
     <Dialog open={!!removal} onOpenChange={open => { if (!open && !action) setRemoval(null) }}>
       {removal ? <DialogContent busy={!!action} className="dswt-confirm-dialog"><div className="dswt-dialog-heading"><DialogTitle className="dswt-dialog-title">{t("removeTitle")}</DialogTitle><DialogDescription className="dswt-form-note">{t("removeDescription")}</DialogDescription></div><div className="dswt-dialog-body"><div className="dswt-remove-target"><GitFork size={18} /><div><strong>{removal.row.branch ?? t("detached")}</strong><code>{removal.row.path}</code></div></div><p className="dswt-preserved"><Check size={14} />{t("branchPreserved")}</p>{removalError ? <div className="dswt-error" role="alert"><AlertCircle size={16} /><span>{removalError}</span></div> : null}</div><div className="dswt-dialog-footer"><Button className="dswt-button-ghost" disabled={!!action} onClick={() => setRemoval(null)}>{t("cancel")}</Button><Button className="dswt-button-danger-solid" disabled={!!action} onClick={() => void remove()}>{action ? <Loader2 size={14} className="dswt-spin" /> : <Trash2 size={14} />}{action ? t("removing") : t("removeConfirmAction")}</Button></div></DialogContent> : null}
     </Dialog>

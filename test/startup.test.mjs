@@ -7,7 +7,7 @@ import * as publishedEntry from "../lib/index.js"
 // Real Connection is important: a plain rpc.handle mock misses the rc.2
 // service-shadow access to webServer that crashes the whole DSH on startup.
 
-const endpoints = ["worktree.list", "worktree.scan", "worktree.classify", "worktree.create", "worktree.remove", "worktree.remove-session", "worktree.status", "worktree.prune"]
+const endpoints = ["worktree.list", "worktree.scan", "worktree.classify", "worktree.create", "worktree.remove", "worktree.remove-session", "worktree.status", "worktree.prune", "review.summary", "review.diff"]
 const requestFor = (endpoint, overrides = {}) => new Request(`http://localhost/api/dsh-simple-worktree/${endpoint}`, {
   method: "POST",
   headers: { "content-type": "application/json" },

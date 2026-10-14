@@ -176,4 +176,24 @@
   @media (prefers-reduced-motion: reduce) {
     .dswt-settings *, .dswt-dialog-content *, .dswt-new-session-action * { animation: none !important; transition: none !important; }
   }
+  .dswt-review-dialog { width: min(1040px, calc(100vw - 40px)); max-height: calc(100dvh - 40px); display: flex; flex-direction: column; }
+  .dswt-review-path { margin: 10px 0 0; color: var(--wt-muted); font-size: 12px; overflow-wrap: anywhere; }
+  .dswt-review-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 24px; }
+  .dswt-review-base { display: flex; align-items: center; gap: 10px; padding: 0 24px 12px; flex-wrap: wrap; }
+  .dswt-review-base .dswt-input { flex: 1; min-width: 140px; }
+  .dswt-review-body { display: grid; grid-template-columns: minmax(150px, 25%) minmax(0, 1fr); min-height: 230px; height: min(55vh, 540px); border-top: 1px solid var(--wt-line); border-bottom: 1px solid var(--wt-line); }
+  .dswt-review-files { overflow: auto; border-right: 1px solid var(--wt-line); padding: 8px; }
+  .dswt-review-files button { display: flex; align-items: start; gap: 6px; width: 100%; text-align: left; border: none; border-radius: 6px; padding: 8px; font: inherit; color: var(--wt-text); background: transparent; cursor: pointer; }
+  .dswt-review-files button span { flex: 1; overflow-wrap: anywhere; }
+  .dswt-review-files button small { color: var(--wt-muted); font-size: 10px; }
+  .dswt-review-files button:hover, .dswt-review-files button[aria-pressed="true"] { background: var(--wt-hover); }
+  .dswt-review-files button:disabled { opacity: .6; cursor: default; }
+  .dswt-review-patch { overflow: auto; padding: 12px 16px; }
+  .dswt-review-patch h3 { font-size: 13px; margin: 0 0 10px; overflow-wrap: anywhere; }
+  .dswt-review-patch pre { font: 12px/19px monospace; margin: 0; white-space: pre; }
+  .dswt-diff-added { color: var(--dsw-alias-state-success-primary, #28a745); }
+  .dswt-diff-deleted { color: var(--wt-danger); }
+  .dswt-diff-hunk { color: var(--dsw-alias-state-info-primary, #5598e9); }
+  .dswt-review-note { margin: 0; padding: 12px 24px; color: var(--wt-muted); font-size: 12px; }
+  @media (max-width: 640px) { .dswt-review-body { grid-template-columns: minmax(100px, 30%) minmax(0, 1fr); } .dswt-review-toolbar { align-items: start; padding: 12px; } .dswt-review-toolbar .dswt-filters { flex-wrap: wrap; } .dswt-review-note { padding: 12px; } .dswt-review-files button { flex-wrap: wrap; } }
 }

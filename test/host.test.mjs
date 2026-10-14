@@ -252,6 +252,7 @@ describe("worktree RPC contract", () => {
     expect([...handleFor().routes.keys()].sort()).toEqual([
       "worktree.list", "worktree.scan", "worktree.classify", "worktree.create",
       "worktree.remove", "worktree.remove-session", "worktree.status", "worktree.prune",
+      "review.summary", "review.diff",
     ].map((endpoint) => `/api/dsh-simple-worktree/${endpoint}`).sort())
   })
 
