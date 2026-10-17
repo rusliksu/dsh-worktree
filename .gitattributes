@@ -1,0 +1,2 @@
+# Native artifact hashes cover exact LF bytes on every platform.
+native/** text eol=lf

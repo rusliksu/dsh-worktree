@@ -15,10 +15,14 @@ import { GitTreeIcon } from "./components/GitTreeIcon"
 import { NewSessionWorktreeButton } from "./components/NewSessionWorktreeButton"
 import { WorkspaceActionPlacement } from "./components/WorkspaceActionPlacement"
 import { WorktreesSettings } from "./components/WorktreesSettings"
+import { SessionRelocationDialog } from "./components/SessionRelocationDialog"
+import type { SessionRelocationTarget } from "./components/SessionRelocationDialog"
 import { createWorktreeApi } from "./lib/api"
 import { installLocale, NS, t } from "./lib/i18n"
 import { pathKey } from "./lib/paths"
-import type { Workspace } from "./lib/types"
+import type { SessionRelocationRemote, Workspace } from "./lib/types"
+import type { SessionId } from "@deepseek-ai/dsh-session/types"
+import { SessionRelocationError } from "./lib/api"
 
 /** The client plugin context surface this plugin touches. */
 export type WorktreeClientContext = Context & {
@@ -38,11 +42,12 @@ function installStyles() {
 
 export const WorktreePlugin = {
   name: "@alpacachen/dsh-simple-worktree",
-  inject: ["slots", "connection", "locale", "workspaces", "sessions", "uiWorkspace"],
+  inject: ["slots", "connection", "locale", "workspaces", "sessions", "uiWorkspace", "remote", "remote.session", "conversation"],
   apply(ctx: WorktreeClientContext) {
     ctx.effect(installStyles, "dsh-simple-worktree styles")
     ctx.effect(() => installLocale(ctx), "dsh-simple-worktree locale")
-    const api = createWorktreeApi(ctx.connection)
+    const remote = ctx.get?.('remote') as { session?: SessionRelocationRemote } | undefined
+    const api = createWorktreeApi(ctx.connection, remote?.session)
     const workspaces = ctx.workspaces
     const sessions = {
       create: ctx.sessions.create.bind(ctx.sessions),
@@ -63,6 +68,7 @@ export const WorktreePlugin = {
     }
     let active = true
     let openCreate: (workspace: Pick<Workspace, "path" | "title">, defaultBaseChoice?: "current" | "main") => void = () => {}
+    let openRelocate: (target: SessionRelocationTarget) => void = () => {}
     let refreshGeneration = 0
 
     const refreshClassification = async () => {
@@ -133,6 +139,50 @@ export const WorktreePlugin = {
         /></WorkspaceActionPlacement>
       )
     }
+
+    function RelocationOverlay() {
+      const [target, setTarget] = useState<SessionRelocationTarget | null>(null)
+      useEffect(() => {
+        openRelocate = setTarget
+        return () => { openRelocate = () => {} }
+      }, [])
+      return target && <SessionRelocationDialog key={target.sessionId} target={target} api={api.relocation} workspaces={workspaces}
+        beforeMove={() => {
+          const scope = ctx.sessions.scope(target.sessionId as SessionId)
+          if (!scope) return
+          const conversation = ctx.get('conversation')
+          if (!conversation) throw new SessionRelocationError('session/relocate-unsupported')
+          const input = conversation.input.for(scope).state.getSnapshot()
+          if (input.phase !== 'plain' || input.attachmentIds.length > 0 || input.occurrences.length > 0) {
+            throw new SessionRelocationError('session/relocate-draft-state')
+          }
+          if (input.queue.length > 0 || ctx.sessions.binding(target.sessionId as SessionId)?.session.getSnapshot().pendingSubmissions.length) {
+            throw new SessionRelocationError('session/relocate-busy')
+          }
+        }}
+        onMoved={async result => {
+          await ctx.sessions.refresh()
+          if (!active) return
+          if (!workspaces.list.getSnapshot().archivedSessionIds.includes(result.sessionId as SessionId)) ctx.uiWorkspace.openSession(result.sessionId as SessionId)
+          setTarget(null)
+        }}
+        onClose={() => setTarget(null)} />
+    }
+
+    ctx.slots.inject('sidebar.workspaces.session.menu.item', () => ctx.slots.register(
+      { name: 'sidebar.workspaces.session.menu.item', id: 'dsh-simple-worktree-relocate', order: 350, label: () => t('moveChat') },
+      ({ sessionId, displayTitle, useMenuOpenState }: PropsRuntime<'sidebar.workspaces.session.menu.item'>) => {
+        const [, setOpen] = useMenuOpenState()
+        return <button type="button" role="menuitem" className="dswt-new-session-action dswt-button dswt-button-ghost" onClick={() => {
+          setOpen(false); openRelocate({ sessionId, title: displayTitle })
+        }}>{t('moveChat')}</button>
+      },
+    ))
+
+    ctx.slots.inject('shell.overlay', () => ctx.slots.register(
+      { name: 'shell.overlay', id: 'dsh-simple-worktree-relocate-dialog', order: 35, label: () => t('moveChat') },
+      RelocationOverlay,
+    ))
 
     ctx.slots.inject("conversation.input.dock", () => ctx.slots.register(
       { name: "conversation.input.dock", id: "dsh-simple-worktree-new-session", order: -30, label: () => t("createWorktree") },

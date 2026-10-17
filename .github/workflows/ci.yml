@@ -40,3 +40,6 @@ jobs:
 
       - name: Run full validation
         run: pnpm test
+
+      - name: Verify pinned native artifacts and shared SDK contract
+        run: pnpm check:relocation-sdk

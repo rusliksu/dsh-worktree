@@ -1,3 +1,71 @@
+- id: session-persistence-jsonl
+  disabled: true
+- id: agent-loop
+  disabled: true
+- id: workspace
+  disabled: true
+- id: session-controller
+  disabled: true
+- id: workspace-controller
+  disabled: true
+- id: file-upload
+  disabled: true
+- id: jobs
+  disabled: true
+- id: approval
+  disabled: true
+- id: agent-preset-registry
+  disabled: true
+- id: ui-chat
+  disabled: true
+- id: api-remotes
+  disabled: true
 - insert:
+    - id: dsh-relocation-config
+      name: ./native/lib/relocation-config.js
+    - id: native-session-persistence-jsonl
+      name: ./native/lib/index.js
+      inject: [relocationConfig]
+      config: !!js "ctx.relocationConfig.get('session-persistence-jsonl', '@deepseek-ai/dsh-session-persistence-jsonl')"
+    - id: native-agent-loop
+      name: ./native/lib/agent-loop.js
+      inject: [relocationConfig, workspaceRegistry]
+      config: !!js "ctx.relocationConfig.get('agent-loop', '@deepseek-ai/dsh-agent-loop')"
+    - id: native-workspace
+      name: ./native/lib/workspace.js
+      inject: [relocationConfig]
+      config: !!js "ctx.relocationConfig.get('workspace', '@deepseek-ai/dsh-workspace')"
+    - id: native-session-controller
+      name: ./native/components/session-controller/lib/index.js
+      inject: [relocationConfig]
+      config: !!js "ctx.relocationConfig.get('session-controller', '@deepseek-ai/dsh-api-session-controller')"
+    - id: native-workspace-controller
+      name: ./native/components/workspace-controller/lib/index.js
+      inject: [relocationConfig]
+      config: !!js "ctx.relocationConfig.get('workspace-controller', '@deepseek-ai/dsh-api-workspace-controller')"
+    - id: native-file-upload
+      name: ./native/components/file-upload/lib/index.js
+      inject: [relocationConfig]
+      config: !!js "ctx.relocationConfig.get('file-upload', '@deepseek-ai/dsh-client-file-upload')"
+    - id: native-jobs
+      name: ./native/lib/jobs.js
+      inject: [relocationConfig]
+      config: !!js "ctx.relocationConfig.get('jobs', '@deepseek-ai/dsh-jobs-local')"
+    - id: native-approval
+      name: ./native/lib/approval.js
+      inject: [relocationConfig]
+      config: !!js "ctx.relocationConfig.get('approval', '@deepseek-ai/dsh-user-approval')"
+    - id: native-agent-preset-registry
+      name: ./native/lib/presets.js
+      inject: [relocationConfig]
+      config: !!js "ctx.relocationConfig.get('agent-preset-registry', '@deepseek-ai/dsh-agent-preset-registry')"
+    - id: native-ui-chat
+      name: ./native/components/ui-chat/lib/index.js
+      inject: [relocationConfig]
+      config: !!js "ctx.relocationConfig.get('ui-chat', '@deepseek-ai/dsh-client-ui-chat')"
+    - id: native-api-remotes
+      name: ./native/components/api-remotes/lib/index.js
+      inject: [relocationConfig]
+      config: !!js "ctx.relocationConfig.get('api-remotes', '@deepseek-ai/dsh-api-remotes')"
     - id: dsh-simple-worktree
       name: "@alpacachen/dsh-simple-worktree"

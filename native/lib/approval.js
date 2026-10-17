@@ -1,0 +1,1 @@
+import Shared from"@deepseek-ai/dsh-user-approval";var RelocationApproval=class extends Shared{setPolicy(agent,policy){let admission=this.ctx.bail("agent/admit-operation",{sessionId:agent.id,agent});try{return super.setPolicy(agent,policy)}finally{admission?.[Symbol.dispose]()}}};export{RelocationApproval as default};
