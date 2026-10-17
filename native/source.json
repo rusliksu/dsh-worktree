@@ -37,13 +37,13 @@
     }
   },
   "outputs": {
-    "package.json": "6b63e2a693fa597c1102c7e142837552eb9259ca86e097f12298a0ab507846c6",
+    "package.json": "cc107e2a48264e6326b0de19a24310a5292a7a09f7d3b81f9d52a906a09dc9e5",
     "lib/agent-loop.js": "ab5162e057a52795a8d38b2c489d31b5548a4914824913f7b88c323079d48713",
     "lib/approval.js": "776ecacf86dd81628bf968a56c29b0133e449c0bf2958b3d4c9de308a7fd41ee",
     "lib/index.js": "9c0c2ab24836a41c08acd21f37f7d9a9c42ba97aa515cc22d11ace85a54245e9",
     "lib/jobs.js": "21aa0cc46b8f30bb599f975a5f75b32edd70460af0db80a848300ce2792a5b8c",
     "lib/presets.js": "6ba479f95ded7c95b67dbe0a5ee3def378df2543b98065818aab9fe6d68f561d",
-    "lib/relocation-config.js": "2670ef090a88364e3ec67e4bbd156530e6add81a846b08ac93e14ecc8b0fbb16",
+    "lib/relocation-config.js": "2d31d031fb06c3416d1d957d9059ceea01aac426b2a2669ab47ba05d2705f8fa",
     "lib/schedule.js": "be83242c3d343673cfbf46e3cb973caea4330c0cb18808e4b854f66890e524d1",
     "lib/session.js": "f5986592c03a8ce61d57df84b47ef0c9db384c60587285687a79a1ea6fee345c",
     "lib/subagent.js": "47d500b2a78b08d17e76964ae7a94a62784c9ff36b1ea34b69d744d4e44021fb",

@@ -41,14 +41,15 @@ const errors = ['WorkspaceUnknownSessionError', 'WorkspaceActiveSessionError', '
 const peers = new Set()
 const inputs = {}
 await mkdir(join(destination, 'lib'), { recursive: true })
-await writeFile(join(destination, 'package.json'), JSON.stringify({ name: '@rusliksu/dsh-chat-relocation-runtime', version: '0.2.0-rc.2-relocation.21', type: 'module' }, null, 2) + '\n')
+await writeFile(join(destination, 'package.json'), JSON.stringify({ name: '@rusliksu/dsh-chat-relocation-runtime', version: '0.2.0-rc.2-relocation.22', type: 'module' }, null, 2) + '\n')
 // The terminal shim imports the installed canonical package; placing it inside a same-name component causes a self import.
 for (const file of ['components/terminal/lib/index.js', 'components/terminal/package.json']) {
   await unlink(join(destination, file)).catch(error => { if (error.code !== 'ENOENT') throw error })
 }
 await mkdir(generated, { recursive: true })
-await cp(join(root, 'src/host/relocation-config.js'), join(destination, 'lib/relocation-config.js'))
-await cp(join(root, 'src/host/relocation-config.js'), join(generated, 'relocation-config.js'))
+const configSource = (await readFile(join(root, 'src/host/relocation-config.js'), 'utf8')).replace(/\r\n/g, '\n')
+await writeFile(join(destination, 'lib/relocation-config.js'), configSource)
+await writeFile(join(generated, 'relocation-config.js'), configSource)
 for (const [name, contents] of Object.entries(ownerSources)) {
   await writeFile(join(generated, name + '.mjs'), contents + '\n')
 }
