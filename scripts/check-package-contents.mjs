@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { execFile } from "node:child_process"
-import { mkdir } from "node:fs/promises"
+import { mkdir, readFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { promisify } from "node:util"
 
@@ -21,6 +21,9 @@ assert.equal(result.length, 1, "npm pack must produce one package manifest")
 
 const files = result[0].files.map(({ path }) => path).sort()
 const expected = ["LICENSE", "README.md", "README.ru.md", "README.zh.md", "client/client.js", "cordis.patch.yml", "docs/preview.png", "lib/index.js", "lib/review.js", "package.json"].sort()
+const native = JSON.parse(await readFile(join(process.cwd(), 'native/source.json'), 'utf8'))
+expected.push('native/source.json', ...Object.keys(native.outputs).map(path => 'native/' + path))
+expected.sort()
 assert.deepEqual(files, expected, "npm package contents changed; update the allowlist deliberately")
 assert.equal(result[0].entryCount, expected.length, "npm package entry count must match the allowlist")
 assert.ok(result[0].size > 0, "npm package must contain bytes")

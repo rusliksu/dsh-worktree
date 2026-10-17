@@ -74,3 +74,31 @@ export interface ConnectionService {
 
 /** The workspace service face (`ctx.workspaces`). */
 export type WorkspacesService = IWorkspaces
+
+/** Browser wire contract supplied by the native relocation API on the pinned Host. */
+export interface SessionRelocationRequest {
+  readonly sessionId: string
+  readonly targetWorkspaceId: string
+  readonly operationId: string
+  readonly expectedCwd: string
+  readonly expectedRevision: string
+}
+
+export interface SessionRelocationResult {
+  readonly sessionId: string
+  readonly sourceWorkspaceId: string
+  readonly targetWorkspaceId: string
+  readonly operationId: string
+  readonly cwd: string
+  readonly revision: string
+}
+
+export type SessionRelocationInfo =
+  | { readonly supported: false }
+  | { readonly supported: true; readonly cwd: string; readonly revision: string }
+
+/** Supplied by ctx.remote.session, which owns authentication and transport. */
+export interface SessionRelocationRemote {
+  relocationInfo?(request: { readonly sessionId: string }, signal?: AbortSignal): Promise<unknown>
+  relocate?(request: SessionRelocationRequest): Promise<unknown>
+}

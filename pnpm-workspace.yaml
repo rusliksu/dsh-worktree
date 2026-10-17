@@ -1,2 +1,4 @@
 allowBuilds:
   esbuild: true
+  # Addon unit/build checks never load Koffi; the installed DSH supplies its reviewed native runtime.
+  koffi: false

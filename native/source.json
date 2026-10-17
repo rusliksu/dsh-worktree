@@ -1,0 +1,70 @@
+{
+  "repository": "https://github.com/rusliksu/deepseek-harness",
+  "revision": "b531f5c249f5d900d9fe0f4685b5837efba1c452",
+  "version": "0.2.0-rc.2",
+  "inputs": {
+    "lib/index.js": "packages/session/session-persistence-jsonl/lib/types/index.js",
+    "lib/agent-loop.js": "packages/core/agent-loop/lib/types/index.js",
+    "lib/workspace.js": "packages/workspace/workspace/lib/types/index.js",
+    "lib/session.js": "packages/api/session-controller/lib/types/index.js",
+    "lib/workspace-api.js": "packages/api/workspace-controller/lib/types/index.js",
+    "lib/jobs.js": "packages/jobs/jobs-local/lib/types/index.js",
+    "lib/subagent.js": "packages/subagent/subagent-spawn-in-process/lib/types/index.js",
+    "lib/uploads.js": "packages/client/file-upload/lib/types/index.js",
+    "lib/schedule.js": "src/host/relocation-owners.mjs#schedule",
+    "lib/terminal.js": "src/host/relocation-owners.mjs#terminal",
+    "lib/approval.js": "src/host/relocation-owners.mjs#approval",
+    "lib/presets.js": "src/host/relocation-owners.mjs#presets",
+    "components/session-controller/lib/client.js": {
+      "source": "packages/api/session-controller/lib/client.js",
+      "sha256": "1568d063e1e0147d16bdf3af54d3a31f4d8eef95113f2bc9feb9ceeac1e8d8a9"
+    },
+    "components/workspace-controller/lib/client.js": {
+      "source": "packages/api/workspace-controller/lib/client.js",
+      "sha256": "e0b5f8ae1f3c286f628b5ffdc0903a83963e18fd6190d5ef042e38385cc578c4"
+    },
+    "components/file-upload/lib/client.js": {
+      "source": "packages/client/file-upload/lib/client.js",
+      "sha256": "4c09378ab7cb3dbe58253bd1fad8c4a00ebf5a93b462d96623edb7bd4e566305"
+    },
+    "components/api-remotes/lib/client.js": {
+      "source": "packages/api/remotes/lib/client.js",
+      "sha256": "3466e66175340d6ac92236850d78287c6f8fcccd6b7a454562b8d99942367332"
+    },
+    "components/ui-chat/lib/client.js": {
+      "source": "packages/client/ui-chat/lib/client.js",
+      "sha256": "da7f554a3398ba2f64e1066dc0132b4f6c767cb0ed78df301e56e20aa742a80b"
+    }
+  },
+  "outputs": {
+    "package.json": "6b63e2a693fa597c1102c7e142837552eb9259ca86e097f12298a0ab507846c6",
+    "lib/agent-loop.js": "ab5162e057a52795a8d38b2c489d31b5548a4914824913f7b88c323079d48713",
+    "lib/approval.js": "776ecacf86dd81628bf968a56c29b0133e449c0bf2958b3d4c9de308a7fd41ee",
+    "lib/index.js": "9c0c2ab24836a41c08acd21f37f7d9a9c42ba97aa515cc22d11ace85a54245e9",
+    "lib/jobs.js": "21aa0cc46b8f30bb599f975a5f75b32edd70460af0db80a848300ce2792a5b8c",
+    "lib/presets.js": "6ba479f95ded7c95b67dbe0a5ee3def378df2543b98065818aab9fe6d68f561d",
+    "lib/relocation-config.js": "2670ef090a88364e3ec67e4bbd156530e6add81a846b08ac93e14ecc8b0fbb16",
+    "lib/schedule.js": "be83242c3d343673cfbf46e3cb973caea4330c0cb18808e4b854f66890e524d1",
+    "lib/session.js": "f5986592c03a8ce61d57df84b47ef0c9db384c60587285687a79a1ea6fee345c",
+    "lib/subagent.js": "47d500b2a78b08d17e76964ae7a94a62784c9ff36b1ea34b69d744d4e44021fb",
+    "lib/terminal.js": "fed439d57a8e9adb543aa1847df4cb1e791605cacab4f4d5ec3a047830e3c369",
+    "lib/uploads.js": "0ab1fd82595f953b0914a6aa0bfbd31207d6bddda6c5d33b60159c90108c1202",
+    "lib/workspace-api.js": "62dec32a906bdb14fcd59bfc43d01c84d575c98c613d93af98209f52aa552da1",
+    "lib/workspace.js": "544acd0505ccf8f0b1667709ff1b4245b75d5639b87da610fb596e00ad221c09",
+    "components/workspace-controller/package.json": "c1e5cba68cc07140396a4616ca487d4cf777aa773ac48cfea9b5aa957cef87bf",
+    "components/workspace-controller/lib/client.js": "7ed0b06a5af248e9fbb7598607c66c2f42e572649efc9b806b4741c68b85016f",
+    "components/workspace-controller/lib/index.js": "62dec32a906bdb14fcd59bfc43d01c84d575c98c613d93af98209f52aa552da1",
+    "components/ui-chat/package.json": "1f239dae766387dfd3322168c98f8233e0a36142f4538727594f7b3aaf7270c3",
+    "components/ui-chat/lib/client.js": "0b2f2a2dc8a69b06473a2cd2aa1f518b89eadcc98e5924fa4a4181ac7b78f083",
+    "components/ui-chat/lib/index.js": "068ca9db33151db77f6985eb5c274c7d97b61cd6c8c96a22ef2c68a5b1c8af44",
+    "components/session-controller/package.json": "803221b9f1ab93b2b44ce6213e50630a9619aaacf4a12edbd7ac7401071bc4b8",
+    "components/session-controller/lib/client.js": "2c67e084b163199c858df1a8bf6c0a11b36b97d2092f8fae164ad4cc1ec2b547",
+    "components/session-controller/lib/index.js": "f5986592c03a8ce61d57df84b47ef0c9db384c60587285687a79a1ea6fee345c",
+    "components/file-upload/package.json": "96d697532e32437e5174d731a6f3edeb716f963ffb4ecb169e63baa75e6deadc",
+    "components/file-upload/lib/client.js": "62e4183799ab3a505419a5fe85b78601b6926544b02fbfb5244d34027834381e",
+    "components/file-upload/lib/index.js": "0ab1fd82595f953b0914a6aa0bfbd31207d6bddda6c5d33b60159c90108c1202",
+    "components/api-remotes/package.json": "f9e8ea020dd5e9f75f99b6a54e9996c169aed29c2abcfcf2c61c74accad700b0",
+    "components/api-remotes/lib/client.js": "b9ad6ac74bc9a32a751ffaedba54dda5e8c7f940958592b789a0614a3145f460",
+    "components/api-remotes/lib/index.js": "cec4c600bf45db5d59941bd89203a656a31a5d8dc1903822b7780b0e000aaec5"
+  }
+}
