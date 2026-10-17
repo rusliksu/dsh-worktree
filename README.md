@@ -25,7 +25,7 @@ A Git worktree plugin for DeepSeek Harness that creates task branches, registers
 
 ## Compatibility
 
-This Desktop fork is built and tested against DSH **0.2.0-rc.2** (web and desktop profiles). It adds Russian UI and an optional managed Windows helper. Removal is disabled; see [the Russian guide](README.ru.md) for creation policy and installation.
+This Desktop fork is built and tested against DSH **0.2.1-rc.2** (web and desktop profiles). It adds Russian UI and an optional managed Windows helper. Removal is disabled; see [the Russian guide](README.ru.md) for creation policy and installation.
 
 ## Usage
 

@@ -36,7 +36,7 @@ export function apply(ctx) {
     await ctx.sessionController.create({ sessionId: id, workspaceId: wa.id, agentPreset: 'minimal' })
     const agent = ctx.agents.get(id)
     agent.session.append('turn/start', { turn: 1 })
-    agent.session.append('user/message', { content: [{ type: 'text', text: 'RELOCATION_HISTORY_MARKER — keep [same.txt](same.txt)' }], source: { kind: 'user', rpcId: randomUUID() }, role: 'user', id: randomUUID() }, { surfaceOp: 'append' })
+    agent.session.append('user/message', { content: [{ type: 'text', text: 'RELOCATION_HISTORY_MARKER — keep [same.txt](same.txt)' }], source: { kind: 'user' }, role: 'user', id: randomUUID() }, { surfaceOp: 'append' })
     agent.session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
     await ctx.sessionController.rename({ sessionId: id, title: 'Relocation browser proof' })
     await ctx.sessionPersistence.flush()
@@ -50,7 +50,7 @@ export function apply(ctx) {
     process.on('message', message => {
       if (message.type !== 'proof-inspect') return
       void (async () => {
-        const info = await ctx.sessionController.relocationInfo({ sessionId: id })
+        const info = await ctx.sessionController.relocationInfo({ sessionId: id }, new AbortController().signal)
         const stored = await ctx.sessionPersistence.open(id, 'read')
         try { assert.deepEqual((await stored.read()).events.slice(0, prefix.length), prefix) } finally { await stored.close() }
         const copies = (await ctx.sessionPersistence.list()).filter(item => item.header.id === id).length

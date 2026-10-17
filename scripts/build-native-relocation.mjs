@@ -6,7 +6,7 @@ import { cp, mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { ownerSources } from '../src/host/relocation-owners.mjs'
 
-const revision = 'b531f5c249f5d900d9fe0f4685b5837efba1c452'
+const revision = '074289f9a36a311c92758622b872ae52a7917b6f'
 const source = resolve(process.argv[2] ?? (() => { throw new Error('Usage: node scripts/build-native-relocation.mjs <verified-native-source>') })())
 const root = process.cwd()
 const destination = join(root, 'native')
@@ -22,7 +22,7 @@ const versionOf = name => {
     ?? manifest.dependencies?.[name] ?? manifest.devDependencies?.[name]
   if (known && !known.startsWith('workspace:')) return known
   for (const pkg of manifests) {
-    const version = pkg.dependencies?.[name] ?? pkg.peerDependencies?.[name]
+    const version = pkg.dependencies?.[name] ?? pkg.peerDependencies?.[name] ?? pkg.devDependencies?.[name]
     if (version && !version.startsWith('workspace:')) return version
   }
   throw new Error('Unresolved shared dependency: ' + name)
@@ -41,7 +41,7 @@ const errors = ['WorkspaceUnknownSessionError', 'WorkspaceActiveSessionError', '
 const peers = new Set()
 const inputs = {}
 await mkdir(join(destination, 'lib'), { recursive: true })
-await writeFile(join(destination, 'package.json'), JSON.stringify({ name: '@rusliksu/dsh-chat-relocation-runtime', version: '0.2.0-rc.2-relocation.30', type: 'module' }, null, 2) + '\n')
+await writeFile(join(destination, 'package.json'), JSON.stringify({ name: '@rusliksu/dsh-chat-relocation-runtime', version: '0.2.1-rc.2-relocation.1', type: 'module' }, null, 2) + '\n')
 // The terminal shim imports the installed canonical package; placing it inside a same-name component causes a self import.
 for (const file of ['components/terminal/lib/index.js', 'components/terminal/package.json']) {
   await unlink(join(destination, file)).catch(error => { if (error.code !== 'ENOENT') throw error })
@@ -119,5 +119,5 @@ for (const file of globSync('**/*', { cwd: destination, exclude: ['source.json']
   const bytes = await readFile(join(destination, file))
   outputs[file.replaceAll('\\', '/')] = createHash('sha256').update(bytes).digest('hex')
 }
-await writeFile(join(destination, 'source.json'), JSON.stringify({ repository: 'https://github.com/rusliksu/deepseek-harness', revision, version: '0.2.0-rc.2', inputs, outputs }, null, 2) + '\n')
+await writeFile(join(destination, 'source.json'), JSON.stringify({ repository: 'https://github.com/rusliksu/deepseek-harness', revision, version: '0.2.1-rc.2', inputs, outputs }, null, 2) + '\n')
 console.log(JSON.stringify({ revision, artifacts: Object.keys(outputs).length, sharedPeers: peers.size }))

@@ -36,7 +36,9 @@ describe.each([
           new HostConnectionService(ctx, [], { isAuthenticated: () => true })
         },
       })
-      const carrier = root.get("connection").createSharedFetchHandler("/api")
+      const connection = root.get("connection")
+      const shared = connection.createSharedFetchHandler("/api")
+      const carrier = { fetch: request => shared.fetch(request, connection.browserPeer) }
 
       for (let attempt = 0; attempt < 2; attempt++) {
         const fiber = root.plugin(plugin)

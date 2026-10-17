@@ -25,7 +25,7 @@
 
 ## 兼容性
 
-此 Desktop 分支基于 DSH **0.2.0-rc.2** 构建，支持 web 和 desktop profile。删除功能已禁用；Windows helper 配置和俄语界面说明见 [README.ru.md](README.ru.md)。
+此 Desktop 分支基于 DSH **0.2.1-rc.2** 构建，支持 web 和 desktop profile。删除功能已禁用；Windows helper 配置和俄语界面说明见 [README.ru.md](README.ru.md)。
 
 ## 使用
 

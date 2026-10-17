@@ -6,8 +6,8 @@ import { join } from 'node:path'
 const root = process.cwd()
 const read = path => JSON.parse(readFileSync(join(root, path), 'utf8'))
 const source = read('native/source.json')
-assert.equal(source.revision, 'b531f5c249f5d900d9fe0f4685b5837efba1c452')
-assert.equal(source.version, '0.2.0-rc.2')
+assert.equal(source.revision, '074289f9a36a311c92758622b872ae52a7917b6f')
+assert.equal(source.version, '0.2.1-rc.2')
 assert.equal(read('native/package.json').dsh?.client, undefined, 'the enclosing Host package must not duplicate the worktree browser client')
 const actual = globSync('native/**/*').filter(file => statSync(file).isFile() && file.replaceAll('\\', '/') !== 'native/source.json')
   .map(file => file.replaceAll('\\', '/').slice('native/'.length)).sort()
@@ -22,7 +22,7 @@ for (const [component, identity] of [
 ]) {
   const pkg = read('native/components/' + component + '/package.json')
   assert.equal(pkg.name, identity)
-  assert.equal(pkg.version, '0.2.0-rc.2')
+  assert.equal(pkg.version, '0.2.1-rc.2')
   assert.equal(pkg.dependencies, undefined, 'components use the shared installed SDK')
   if (component !== 'terminal') {
     assert.equal(pkg.exports['./client'], './lib/client.js')
@@ -32,7 +32,7 @@ for (const [component, identity] of [
 }
 assert.match(readFileSync(join(root, 'native/components/api-remotes/lib/client.js'), 'utf8'), /relocationInfo/)
 const manifest = read('package.json')
-assert.equal(manifest.dsh.compatibility.dsh, '0.2.0-rc.2')
+assert.equal(manifest.dsh.compatibility.dsh, '0.2.1-rc.2')
 for (const file of actual.filter(file => file.endsWith('.js'))) {
   const text = readFileSync(join(root, 'native', file), 'utf8')
   assert.ok(!/C:[\\/]Users[\\/]|\.codex[\\/]/i.test(text), 'private workstation path in ' + file)
