@@ -16,6 +16,11 @@ export function apply(ctx) {
       assert.equal((await ctx.sessionPersistence.list()).filter(row => row.header.id === facts.id).length, 1)
       assert.ok(ctx.workspaceRegistry.get(facts.wa).sessionIds.includes(facts.id))
       assert.ok(!ctx.workspaceRegistry.get(facts.wb).sessionIds.includes(facts.id))
+      if (process.env.RELOCATION_COLD === '1') {
+        const seed = JSON.parse(await readFile(process.env.RELOCATION_OUTPUT + '/seed-schedule.json', 'utf8'))
+        assert.deepEqual((await ctx.get('schedule').list({ sessionId: seed.sessionId })).find(record => record.id === seed.record.id), seed.record)
+        report.checks.push('original Schedule still reads the same pre-existing task after rollback')
+      }
       report.checks.push('original installed reader opens A after native return, keeps exact prefix and unique membership')
       report.status = 'passed'
     } catch (error) { report.status = 'failed'; report.error = { name: error.name, message: error.message, code: error.code } }

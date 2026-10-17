@@ -15,6 +15,12 @@ export function apply(ctx) {
 async function check(ctx) {
   const root = process.env.DSH_DELIVERY_PROOF
   const report = { status: 'running', invocation: process.env.DSH_DELIVERY_INVOCATION, modelCalls: 0, checks: [] }
+  // Observe the public native failure before the Remote boundary normalises its message; preserve the operation unchanged.
+  const nativeRelocate = ctx.agentLoop.relocate.bind(ctx.agentLoop)
+  ctx.agentLoop.relocate = (...args) => nativeRelocate(...args).catch(error => {
+    report.nativeRefusal = { code: error.code, message: error.message }
+    throw error
+  })
   const run = async (name, callback) => { report.current = name; await callback(); report.checks.push(name) }
   const rpc = (method, request) => ctx.typertGateway.invoke({ namespace: 'session', method, args: { request } })
   ctx.on('llm/stream', () => { report.modelCalls++; throw new Error('No model calls are permitted by this proof') })
@@ -43,6 +49,17 @@ async function check(ctx) {
         assert.equal(createHash('sha256').update(await readFile(path)).digest('hex'), inputs.outputs['components/' + component + '/lib/client.js'])
       }
       assert.equal(graph.entries.filter(row => row.id === '@alpacachen/dsh-simple-worktree').length, 1)
+    })
+    if (process.env.RELOCATION_COLD === '1') await run('global Schedule uses the compatible installed owner and original settings', async () => {
+      const schedule = ctx.get('schedule')
+      assert.ok(schedule)
+      assert.equal(schedule[Symbol.for('dsh.chat-relocation.schedule')], true)
+      const row = [...ctx.loader.entries()].find(entry => entry.options.id === 'dsh-relocation-global-schedule')
+      assert.ok(row?.fiber)
+      assert.equal(row.fiber.config.deliveryHistoryDays, 17)
+      assert.equal(row.fiber.config.deliveryHistoryRecords, 23)
+      const seed = JSON.parse(await readFile(process.env.RELOCATION_OUTPUT + '/seed-schedule.json', 'utf8'))
+      assert.deepEqual((await schedule.list({ sessionId: seed.sessionId })).find(record => record.id === seed.record.id), seed.record)
     })
     const id = 'delivery-relocation-' + randomUUID()
     await mkdir(join(root, 'a'), { recursive: true }); await mkdir(join(root, 'b'), { recursive: true })

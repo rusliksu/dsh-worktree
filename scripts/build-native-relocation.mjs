@@ -41,7 +41,7 @@ const errors = ['WorkspaceUnknownSessionError', 'WorkspaceActiveSessionError', '
 const peers = new Set()
 const inputs = {}
 await mkdir(join(destination, 'lib'), { recursive: true })
-await writeFile(join(destination, 'package.json'), JSON.stringify({ name: '@rusliksu/dsh-chat-relocation-runtime', version: '0.2.0-rc.2-relocation.22', type: 'module' }, null, 2) + '\n')
+await writeFile(join(destination, 'package.json'), JSON.stringify({ name: '@rusliksu/dsh-chat-relocation-runtime', version: '0.2.0-rc.2-relocation.30', type: 'module' }, null, 2) + '\n')
 // The terminal shim imports the installed canonical package; placing it inside a same-name component causes a self import.
 for (const file of ['components/terminal/lib/index.js', 'components/terminal/package.json']) {
   await unlink(join(destination, file)).catch(error => { if (error.code !== 'ENOENT') throw error })
@@ -50,6 +50,7 @@ await mkdir(generated, { recursive: true })
 const configSource = (await readFile(join(root, 'src/host/relocation-config.js'), 'utf8')).replace(/\r\n/g, '\n')
 await writeFile(join(destination, 'lib/relocation-config.js'), configSource)
 await writeFile(join(generated, 'relocation-config.js'), configSource)
+await writeFile(join(destination, 'lib/relocation-cold.js'), (await readFile(join(root, 'src/host/relocation-cold.mjs'), 'utf8')).replace(/\r\n/g, '\n'))
 for (const [name, contents] of Object.entries(ownerSources)) {
   await writeFile(join(generated, name + '.mjs'), contents + '\n')
 }
@@ -88,7 +89,7 @@ for (const [name, directory, host] of [
     const originalClient = await readFile(join(source, directory, 'lib/client.js'), 'utf8')
     for (const item of originalClient.matchAll(/\brequire\(["']([^"']+)["']\)/g)) collect(item[1])
     // Normal client output includes CSS source-path comments. Remove debugging comments without shipping workstation paths.
-    const client = await transform(originalClient, { loader: 'js', minify: true, legalComments: 'none', target: 'es2020' })
+    const client = await transform(originalClient, { loader: 'js', format: 'iife', minify: true, legalComments: 'none', target: 'es2020' })
     await writeFile(join(component, 'lib/client.js'), client.code)
     await unlink(join(component, 'lib/client.js.map')).catch(error => { if (error.code !== 'ENOENT') throw error })
     inputs['components/' + name + '/lib/client.js'] = { source: directory + '/lib/client.js', sha256: createHash('sha256').update(originalClient).digest('hex') }

@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process'
 import { cp, mkdir, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
+import { prepareCold } from './prepare-cold.mjs'
 const { chromium } = await import(pathToFileURL(process.env.RELOCATION_PLAYWRIGHT).href)
 const base = process.env.RELOCATION_OUTPUT
 const home = base + '/home', profile = home + '/profiles/web'
@@ -22,11 +23,19 @@ await writeFile(profile + '/cordis.patch.yml', `- id: webserver
 - id: agent-loop
   config:
     agents: []
+- id: agent-default-model
+  config:
+    provider: relocation-proof
+    model: no-stream
+- id: ui-settings-general
+  config:
+    welcomeNoticeVersion: 2026-09-28.1
 - insert:
     - id: delivery-browser-fixture
       name: ${profile}/delivery-browser-fixture.mjs
 `)
 const resources = process.env.RELOCATION_RESOURCES, runtime = resources + '/app.asar/dsh'
+if (process.env.RELOCATION_COLD === '1') await prepareCold(profile)
 const child = spawn(process.env.RELOCATION_EXECUTABLE, ['--expose-internals', runtime + '/node_modules/@deepseek-ai/dsh-desktop-host/lib/index.js', runtime, profile, resources + '/runtime/primary-runtime', resources + '/runtime/pnpm/bin/pnpm.mjs', resources + '/runtime/bin'], {
   cwd: profile, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
   env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1', DSH_CLIENT_VERSION: '0.2.0-rc.2', DSH_DELIVERY_PROOF: root, DSH_BROWSER_PHASE: phase },
@@ -46,6 +55,8 @@ const hostExit = new Promise(resolve => child.on('exit', code => resolve(code)))
 child.on('message', message => { if (message.type === 'fatal') fatal = true })
 const ready = waitMessage('ready'), fixture = waitMessage('proof-fixture')
 const report = { status: 'running', checks: [], root, phase }
+child.on('message', message => { if (message.type === 'proof-native-refusal') report.nativeRefusal = { code: message.code, message: message.message } })
+child.on('message', message => { if (message.type === 'proof-owner-event') (report.ownerEvents ??= []).push(message.event) })
 const consoleErrors = []
 try {
   const [host, { facts }] = await Promise.all([ready, fixture])
@@ -128,6 +139,7 @@ try {
   report.pageErrors = errors
 } catch (error) {
   report.status = 'failed'; report.error = error.message.replace(/https?:\/\/\S+/g, '[URL]')
+  if (page) report.bootModules = await page.evaluate(() => (window.__DSH_BOOT__?.entries ?? []).map(({ id, inject, external, immediately }) => ({ id, inject, external, immediately }))).catch(() => [])
   if (page) { await writeFile(root + '/failure-aria.txt', await page.locator('body').ariaSnapshot().catch(() => 'unavailable')); await page.screenshot({ path: root + '/failure.png' }).catch(() => {}) }
   process.exitCode = 1
 } finally {

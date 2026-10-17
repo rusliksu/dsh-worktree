@@ -3,7 +3,7 @@ import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { LlmAdapter } from '@deepseek-ai/dsh-llm'
-export const inject = ['workspaceRegistry', 'sessionController', 'agents', 'sessionPersistence', 'llm']
+export const inject = ['workspaceRegistry', 'sessionController', 'agents', 'sessionPersistence', 'llm', 'agentLoop']
 class NoStreamAdapter extends LlmAdapter {
   providerInfo() { return { id: 'relocation-proof', name: 'Relocation proof (no requests)' } }
   async listModels() { return [{ provider: 'relocation-proof', id: 'no-stream', name: 'No requests' }] }
@@ -11,12 +11,17 @@ class NoStreamAdapter extends LlmAdapter {
   async *stream() { throw Error('Browser relocation proof forbids model requests') }
 }
 export function apply(ctx) {
+  ctx.on('loader/partial-dispose', (entry, legacy, active) => {
+    if (entry.options.id === 'dsh-relocation-global-schedule') process.send?.({ type: 'proof-owner-event', event: { previous: legacy.name, next: entry.options.name, active, configChanged: JSON.stringify(legacy.config) !== JSON.stringify(entry.options.config), injectChanged: JSON.stringify(legacy.inject) !== JSON.stringify(entry.options.inject) } })
+  }, { global: true })
   ctx.effect(() => ctx.llm.registerAdapter(['relocation-proof'], new NoStreamAdapter()))
   let modelCalls = 0
   ctx.on('llm/stream', () => { modelCalls++; throw Error('No model requests permitted') })
   const timer = setTimeout(() => void prepare(ctx).catch(error => process.send?.({ type: 'proof-error', message: error.message })), 400)
   ctx.effect(() => () => clearTimeout(timer))
   async function prepare() {
+    const relocate = ctx.agentLoop.relocate.bind(ctx.agentLoop)
+    ctx.agentLoop.relocate = (...args) => relocate(...args).catch(error => { process.send?.({ type: 'proof-native-refusal', code: error.code, message: error.message }); throw error })
     const root = process.env.DSH_DELIVERY_PROOF
     let facts, prefix
     if (process.env.DSH_BROWSER_PHASE === 'verify') {
@@ -29,7 +34,6 @@ export function apply(ctx) {
     const wa = await ctx.workspaceRegistry.create(a), wb = await ctx.workspaceRegistry.create(b)
     const id = 'browser-relocation-' + randomUUID()
     await ctx.sessionController.create({ sessionId: id, workspaceId: wa.id, agentPreset: 'minimal' })
-    await ctx.sessionController.selectModel({ sessionId: id, provider: 'relocation-proof', model: 'no-stream' })
     const agent = ctx.agents.get(id)
     agent.session.append('turn/start', { turn: 1 })
     agent.session.append('user/message', { content: [{ type: 'text', text: 'RELOCATION_HISTORY_MARKER — keep [same.txt](same.txt)' }], source: { kind: 'user', rpcId: randomUUID() }, role: 'user', id: randomUUID() }, { surfaceOp: 'append' })

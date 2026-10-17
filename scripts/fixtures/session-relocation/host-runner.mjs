@@ -1,18 +1,20 @@
 import { spawn } from 'node:child_process'
 import { cp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
+import { prepareCold } from './prepare-cold.mjs'
 
 const base = process.env.RELOCATION_OUTPUT
 const home = base + '/home'
 const profile = home + '/profiles/web'
 const original = process.argv[2] === 'original'
+const seed = process.argv[2] === 'seed'
 const invocation = randomUUID()
 const root = process.argv[3] ?? base + '/delivery-runs/' + randomUUID()
 if (!root.startsWith(base + '/delivery-runs/')) throw Error('proof root outside task directory')
 await mkdir(root, { recursive: true })
-const checkFile = original ? 'delivery-original-reader-check.mjs' : 'delivery-sdk-check.mjs'
-const reportFile = original ? 'delivery-original-report.json' : 'delivery-sdk-report.json'
-await cp(new URL(original ? './original-reader-check.mjs' : './sdk-check.mjs', import.meta.url), profile + '/' + checkFile)
+const checkFile = seed ? 'delivery-schedule-seed-check.mjs' : original ? 'delivery-original-reader-check.mjs' : 'delivery-sdk-check.mjs'
+const reportFile = seed ? 'delivery-schedule-seed-report.json' : original ? 'delivery-original-report.json' : 'delivery-sdk-report.json'
+await cp(new URL(seed ? './schedule-seed-check.mjs' : original ? './original-reader-check.mjs' : './sdk-check.mjs', import.meta.url), profile + '/' + checkFile)
 await writeFile(profile + '/cordis.patch.yml', `- id: webserver
   config:
     host: 127.0.0.1
@@ -30,11 +32,13 @@ await writeFile(profile + '/cordis.patch.yml', `- id: webserver
     transcriptView: compact
     performanceUsage: compact
     linkOpening: new-tab
+${process.env.RELOCATION_COLD === '1' ? '- id: schedule\n  config:\n    deliveryHistoryDays: 17\n    deliveryHistoryRecords: 23\n' : ''}
 - insert:
     - id: delivery-sdk-proof
       name: ${profile}/${checkFile}
 `)
 const resources = process.env.RELOCATION_RESOURCES
+if (!original && !seed && process.env.RELOCATION_COLD === '1') await prepareCold(profile)
 const runtime = resources + '/app.asar/dsh'
 const child = spawn(process.env.RELOCATION_EXECUTABLE, ['--expose-internals', runtime + '/node_modules/@deepseek-ai/dsh-desktop-host/lib/index.js', runtime, profile, resources + '/runtime/primary-runtime', resources + '/runtime/pnpm/bin/pnpm.mjs', resources + '/runtime/bin'], {
   cwd: profile, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
