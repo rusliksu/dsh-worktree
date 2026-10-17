@@ -30,7 +30,7 @@ const environment = { ...process.env, RELOCATION_COLD: '1', RELOCATION_OUTPUT: o
   ...(options.has('--browser') ? { RELOCATION_BROWSER: options.get('--browser') } : {}) }
 const home = join(output, 'home')
 const helper = join(output, 'installed-cli.mjs')
-await writeFile(helper, `import { delimiter } from 'node:path'\nimport { pathToFileURL } from 'node:url'\nconst resources = ${JSON.stringify(resources)}\nconst { runCli } = await import(pathToFileURL(resources + '/app.asar/dsh/node_modules/@deepseek-ai/dsh/lib/bin.js').href)\nawait runCli({ packageManager: { command: process.execPath, args: ['--expose-internals', resources + '/runtime/pnpm/bin/pnpm.mjs'], env: { ELECTRON_RUN_AS_NODE: '1', DSH_DESKTOP_NODE_EXECUTABLE: process.execPath, PATH: resources + '/runtime/bin' + delimiter + process.env.PATH } } })\n`)
+await writeFile(helper, `import { delimiter } from 'node:path'\nimport { pathToFileURL } from 'node:url'\nconst resources = ${JSON.stringify(resources)}\nconst { runCli } = await import(pathToFileURL(resources + '/app.asar/dsh/node_modules/@deepseek-ai/dsh/lib/bin.js').href)\nawait runCli({ packageManager: { command: process.execPath, args: ['--expose-internals', resources + '/runtime/primary-runtime/dependencies/pnpm/bin/pnpm.mjs'], env: { ELECTRON_RUN_AS_NODE: '1', DSH_DESKTOP_NODE_EXECUTABLE: process.execPath, PATH: resources + '/runtime/bin' + delimiter + process.env.PATH } } })\n`)
 async function run(command, args, env = environment) {
   await new Promise((resolveRun, reject) => {
     const child = spawn(command, args, { windowsHide: true, cwd: sourceRoot, env, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -51,10 +51,9 @@ const report = { status: 'running', nativeRevision: native.revision, packageSha2
 let removed = false
 try {
   await cli('add', archive)
-  // Match the optional global Schedule present in the target Desktop, without any real account data.
+  // The current web bundle includes the global Schedule; use its normal owner.
   const profileFile = join(home, 'profiles/web/package.json')
   const profileManifest = JSON.parse(await readFile(profileFile, 'utf8'))
-  profileManifest.dsh.profile.bundles.splice(-1, 0, '@deepseek-ai/dsh-experimental-schedule-bundle')
   await writeFile(profileFile, JSON.stringify(profileManifest, null, 2) + '\n')
   await run(executable, ['--expose-internals', join(fixtures, 'cold-cases.mjs')], { ...environment, ELECTRON_RUN_AS_NODE: '1' })
   report.checks.push('installed composition preserves optional/disabled/expression/parent settings and rejects stale/foreign ownership')

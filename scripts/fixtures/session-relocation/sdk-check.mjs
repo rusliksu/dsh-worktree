@@ -7,7 +7,7 @@ import SharedPersistence from '@deepseek-ai/dsh-session-persistence'
 import SharedAgents from '@deepseek-ai/dsh-agent'
 import SharedPresets from '@deepseek-ai/dsh-agent-preset-registry'
 
-export const inject = ['workspaceRegistry', 'sessionController', 'typertGateway', 'agentPresets', 'sessions', 'agents', 'sessionPersistence', 'agentLoop', 'clientModules', 'relocationConfig']
+export const inject = ['connection', 'workspaceRegistry', 'sessionController', 'typertGateway', 'agentPresets', 'sessions', 'agents', 'sessionPersistence', 'agentLoop', 'clientModules', 'relocationConfig']
 export function apply(ctx) {
   const timer = setTimeout(() => void check(ctx), 500)
   ctx.effect(() => () => clearTimeout(timer))
@@ -22,7 +22,7 @@ async function check(ctx) {
     throw error
   })
   const run = async (name, callback) => { report.current = name; await callback(); report.checks.push(name) }
-  const rpc = (method, request) => ctx.typertGateway.invoke({ namespace: 'session', method, args: { request } })
+  const rpc = (method, request) => ctx.typertGateway.invoke({ namespace: 'session', method, args: { request }, peer: ctx.connection.browserPeer })
   ctx.on('llm/stream', () => { report.modelCalls++; throw new Error('No model calls are permitted by this proof') })
   try {
     await run('ordinary bundle keeps one installed SDK and original configuration', async () => {

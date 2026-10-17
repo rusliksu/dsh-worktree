@@ -13,7 +13,9 @@ const { entryListSchema } = await import(pathToFileURL(req.resolve('@deepseek-ai
 const files = ['package.json', 'cordis.patch.yml', 'pnpm-lock.yaml']
 const original = new Map(await Promise.all(files.map(async name => [name, await readFile(profile + '/' + name, 'utf8')])))
 const manifest = JSON.parse(original.get('package.json'))
-manifest.dsh.profile.bundles = manifest.dsh.profile.bundles.filter(name => name !== '@deepseek-ai/dsh-experimental-schedule-bundle')
+// The current web bundle owns Schedule. Omit that bundle only in these
+// parser/composition cases so each synthetic owner is the sole declaration.
+manifest.dsh.profile.bundles = manifest.dsh.profile.bundles.filter(name => !['@deepseek-ai/dsh-experimental-schedule-bundle', '@deepseek-ai/dsh-web-app'].includes(name))
 const results = []
 const cases = [
   ['absent', []],

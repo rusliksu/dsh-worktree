@@ -4,8 +4,8 @@ import { randomUUID } from 'node:crypto'
 import { prepareCold } from './prepare-cold.mjs'
 
 const base = process.env.RELOCATION_OUTPUT
-const home = base + '/home'
-const profile = home + '/profiles/web'
+const home = process.env.RELOCATION_HOME ?? base + '/home'
+const profile = home + '/profiles/' + (process.env.RELOCATION_PROFILE ?? 'web')
 const original = process.argv[2] === 'original'
 const seed = process.argv[2] === 'seed'
 const invocation = randomUUID()
@@ -40,9 +40,9 @@ ${process.env.RELOCATION_COLD === '1' ? '- id: schedule\n  config:\n    delivery
 const resources = process.env.RELOCATION_RESOURCES
 if (!original && !seed && process.env.RELOCATION_COLD === '1') await prepareCold(profile)
 const runtime = resources + '/app.asar/dsh'
-const child = spawn(process.env.RELOCATION_EXECUTABLE, ['--expose-internals', runtime + '/node_modules/@deepseek-ai/dsh-desktop-host/lib/index.js', runtime, profile, resources + '/runtime/primary-runtime', resources + '/runtime/pnpm/bin/pnpm.mjs', resources + '/runtime/bin'], {
+const child = spawn(process.env.RELOCATION_EXECUTABLE, ['--expose-internals', runtime + '/node_modules/@deepseek-ai/dsh-desktop-host/lib/index.js', runtime, profile, resources + '/runtime/primary-runtime', resources + '/runtime/primary-runtime/dependencies/pnpm/bin/pnpm.mjs', resources + '/runtime/bin'], {
   cwd: profile, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
-  env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1', DSH_CLIENT_VERSION: '0.2.0-rc.2',
+  env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1', DSH_CLIENT_VERSION: '0.2.1-rc.2',
     DSH_DELIVERY_PROOF: root, DSH_DELIVERY_SOURCE: base + '/delivery-native-source.json', DSH_DELIVERY_INVOCATION: invocation },
 })
 let done = false, fatal = false, tail = ''
