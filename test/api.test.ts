@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { createWorktreeApi } from "../src/client/lib/api"
+import { createSessionRelocationApi, createWorktreeApi } from "../src/client/lib/api"
 
 describe("worktree client API routing", () => {
   const createPayload = { repoPath: "/repo", path: "/repo.worktrees/task", branch: "task", baseRef: "main" }
@@ -117,5 +117,81 @@ describe("worktree client API routing", () => {
 
     await expect(api.list("/repo")).rejects.toBe(error)
     expect(call.mock.calls).toEqual([["/api", "dsh-simple-worktree/worktree.list", { path: "/repo" }, expect.any(AbortSignal)]])
+  })
+})
+
+describe("native same-ID relocation client", () => {
+  const request = Object.freeze({ sessionId: "existing-chat", targetWorkspaceId: "project-b", expectedCwd: "/a", expectedRevision: "observed-7", operationId: "7b38006a-69f3-419f-928d-d486a441e9dc" })
+  const result = { sessionId: "existing-chat", sourceWorkspaceId: "project-a", targetWorkspaceId: "project-b", operationId: request.operationId, cwd: "/b", revision: "committed-8" }
+
+  it("provides the native companion through the production worktree API factory without using worktree RPC", async () => {
+    const call = vi.fn()
+    const relocate = vi.fn().mockResolvedValue({ ok: true, value: result })
+    const api = createWorktreeApi({ rpc: { call } }, { relocate })
+    await expect(api.relocation.relocate(request)).resolves.toEqual(result)
+    expect(call).not.toHaveBeenCalled()
+    expect(relocate).toHaveBeenCalledTimes(1)
+  })
+
+  afterEach(() => vi.useRealTimers())
+
+  it("uses the authenticated Remote service and forwards the exact source observation", async () => {
+    const remote = {
+      relocationInfo: vi.fn().mockResolvedValue({ ok: true, value: { supported: true, cwd: "/a", revision: "observed-7", directoryContexts: [{ from: 0, cwd: "/a" }] } }),
+      relocate: vi.fn().mockResolvedValue({ ok: true, value: result }),
+    }
+    const api = createSessionRelocationApi(remote)
+    const signal = new AbortController().signal
+    await expect(api.info("existing-chat", signal)).resolves.toEqual({ supported: true, cwd: "/a", revision: "observed-7" })
+    await expect(api.relocate(request)).resolves.toEqual(result)
+    expect(remote.relocationInfo.mock.calls).toEqual([[{ sessionId: "existing-chat" }, signal]])
+    expect(remote.relocate.mock.calls).toEqual([[request]])
+  })
+
+  it.each([undefined, {}, { relocate: vi.fn() }, { relocationInfo: vi.fn() }])("reports unsupported without any mutation for an older client %j", async remote => {
+    const api = createSessionRelocationApi(remote)
+    await expect(api.info("existing-chat")).resolves.toEqual({ supported: false })
+    if (remote && "relocate" in remote) expect(remote.relocate).not.toHaveBeenCalled()
+  })
+
+  it.each(["gateway/method-unavailable", "gateway/invocation-unavailable", "session/relocate-unsupported"])("recognizes an older Host's %s response", async code => {
+    const api = createSessionRelocationApi({ relocationInfo: vi.fn().mockResolvedValue({ ok: false, error: { code } }), relocate: vi.fn() })
+    await expect(api.info("existing-chat")).resolves.toEqual({ supported: false })
+  })
+
+  it.each(["busy", "conflict", "target-invalid", "unsupported", "recovery-required"])("keeps the native %s refusal without exposing a stack or claiming success", async suffix => {
+    const code = `session/relocate-${suffix}`
+    const relocate = vi.fn().mockResolvedValue({ ok: false, error: { code, message: "private host details", stack: "private stack" } })
+    await expect(createSessionRelocationApi({ relocate }).relocate(request)).rejects.toMatchObject({ code, message: code })
+    expect(relocate).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([undefined, { ok: true }, { ok: true, value: { ...result, sessionId: "new-fork" } }, { ok: true, value: { ...result, targetWorkspaceId: "foreign-project" } }, { ok: true, value: { ...result, operationId: "different-operation" } }, { ok: true, value: { ...result, revision: "" } }])("rejects an incomplete or foreign success %j", async value => {
+    const api = createSessionRelocationApi({ relocate: vi.fn().mockResolvedValue(value) })
+    await expect(api.relocate(request)).rejects.toMatchObject({ code: "session/relocate-invalid-response" })
+  })
+
+  it.each([{ supported: true }, { supported: true, cwd: "/a", revision: "" }, { supported: "true", cwd: "/a", revision: "r" }])("rejects a malformed support observation %j", async value => {
+    const api = createSessionRelocationApi({ relocationInfo: vi.fn().mockResolvedValue({ ok: true, value }), relocate: vi.fn() })
+    await expect(api.info("existing-chat")).rejects.toMatchObject({ code: "session/relocate-invalid-response" })
+  })
+
+  it.each([{ ...request, targetWorkspaceId: " " }, { ...request, expectedRevision: "" }, { ...request, expectedCwd: "" }, { ...request, operationId: "not-a-uuid" }])("refuses incomplete intent before sending it %j", async value => {
+    const relocate = vi.fn()
+    await expect(createSessionRelocationApi({ relocate }).relocate(value)).rejects.toMatchObject({ code: "gateway/bad-request" })
+    expect(relocate).not.toHaveBeenCalled()
+  })
+
+  it("never retries a disconnected mutation and preserves the caller's operation for explicit retry", async () => {
+    vi.useFakeTimers()
+    const failure = new Error("connection closed after commit")
+    const relocate = vi.fn().mockRejectedValueOnce(failure).mockResolvedValueOnce({ ok: true, value: result })
+    const api = createSessionRelocationApi({ relocate })
+    await expect(api.relocate(request)).rejects.toBe(failure)
+    await vi.advanceTimersByTimeAsync(60000)
+    expect(relocate).toHaveBeenCalledTimes(1)
+    await expect(api.relocate(request)).resolves.toEqual(result)
+    expect(relocate.mock.calls).toEqual([[request], [request]])
+    expect(vi.getTimerCount()).toBe(0)
   })
 })

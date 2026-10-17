@@ -24,8 +24,8 @@ describe("WorktreePlugin compatibility", () => {
     }
 
     expect(() => WorktreePlugin.apply(ctx as any)).not.toThrow()
-    expect(registeredSlots).toEqual(["conversation.input.dock", "shell.overlay", "settings.section"])
-    expect(WorktreePlugin.inject).toEqual(["slots", "connection", "locale", "workspaces", "sessions", "uiWorkspace"])
+    expect(registeredSlots).toEqual(["sidebar.workspaces.session.menu.item", "shell.overlay", "conversation.input.dock", "shell.overlay", "settings.section"])
+    expect(WorktreePlugin.inject).toEqual(["slots", "connection", "locale", "workspaces", "sessions", "uiWorkspace", "remote", "remote.session", "conversation"])
     // Exercise the actual adapter passed to consumers: ISessions has no open().
     const { sessions } = renderers.get("settings.section")!({ close: vi.fn() }).props
     await sessions.create({ workspaceId: "ws-new" })
